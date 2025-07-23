@@ -18,8 +18,22 @@ export async function createFeedback(req, res) {
 }
 
 export async function getFeedbacks(req, res) {
-  const feedbacks = await Feedback.find().sort({ createdAt: -1 });
-  res.status(200).json(feedbacks);
+  try {
+    const category = req.query.category;
+    let filter = {};
+    if (category && category !== "All") {
+      filter.category = category;
+    }
+
+    const feedbacks = await Feedback.find(filter)
+      .populate("user", "username email")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(feedbacks);
+  } catch (error) {
+    console.error("Error fetching feedbacks:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 }
 
 export async function getFeedbackById(req, res) {
