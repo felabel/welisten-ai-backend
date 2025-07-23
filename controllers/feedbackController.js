@@ -51,3 +51,25 @@ export async function updateFeedback(req, res) {
 
   res.status(200).json(feedback);
 }
+
+export const upvoteFeedback = async (req, res) => {
+  const { feedbackId } = req.params;
+  try {
+    const feedback = await Feedback.findByIdAndUpdate(
+      feedbackId,
+      { $inc: { upvotes: 1 } },
+      { new: true }
+    );
+    if (!feedback) {
+      return res.status(404).json({ message: "Feedback not found" });
+    }
+    res.status(200).json({
+      message: "Feedback upvoted successfully",
+      upvotes: feedback.upvotes,
+      feedback,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
