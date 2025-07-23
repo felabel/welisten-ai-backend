@@ -26,5 +26,6 @@ commentSchema.virtual("id").get(function () {
   return this._id.toHexString();
 });
 commentSchema.set("toJSON", { virtuals: true });
+
 export const Comment = model("Comment", commentSchema);
 export default Comment;

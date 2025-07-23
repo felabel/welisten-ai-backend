@@ -12,5 +12,6 @@ const router = express.Router();
 router.post("/", protect, addComment);
 router.get("/:feedbackId", getCommentsByFeedbackId);
 router.post("/reply", protect, addReply);
+router.post("/:commentId/replies", protect, addReply);
 
 export default router;

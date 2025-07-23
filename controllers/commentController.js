@@ -31,8 +31,9 @@ export const getCommentsByFeedbackId = async (req, res) => {
 
 // Reply to a comment
 export const addReply = async (req, res) => {
-  const { commentId } = req.body;
+  const { commentId } = req.params;
   const comment = await Comment.findById(commentId);
+
   if (!comment) {
     return res.status(404).json({ message: "Comment not found" });
   }
