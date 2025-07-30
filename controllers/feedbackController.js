@@ -20,7 +20,8 @@ export async function createFeedback(req, res) {
 
 export async function getFeedbacks(req, res) {
   try {
-    const category = req.query.category;
+    // sort by category
+    const { category, sort, page = 1, limit = 10 } = req.query;
     const allowedCategories = getFeedbackCatgeroies();
     let filter = {};
     if (category && category !== "All") {
@@ -34,11 +35,68 @@ export async function getFeedbacks(req, res) {
       }
     }
 
-    const feedbacks = await Feedback.find(filter)
-      .populate("user", "username email")
-      .sort({ createdAt: -1 });
+    const pageNum = parseInt(page, 10);
+    const pageSize = parseInt(limit, 10);
+    const skip = (pageNum - 1) * pageSize;
 
-    res.status(200).json(feedbacks);
+    // sort by least and most upvotes
+    let sortOption = { createdAt: -1 };
+    if (sort === "least_upvotes") sortOption = { upvotes: 1 };
+    if (sort === "most_upvotes") sortOption = { upvotes: -1 };
+    if (sort === "least_comments") sortOption = { commentCount: 1 };
+    if (sort === "most_comments") sortOption = { commentCount: -1 };
+
+    const pipeline = [
+      { $match: filter },
+      {
+        $lookup: {
+          from: "comments", // name of the comments collection
+          localField: "_id",
+          foreignField: "feedback",
+          as: "commentsData",
+        },
+      },
+      {
+        $addFields: {
+          commentCount: { $size: { $ifNull: ["$commentsData", []] } },
+        },
+      },
+      { $sort: sortOption },
+      { $skip: skip },
+      { $limit: pageSize },
+
+      {
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: "$user" },
+      {
+        $project: {
+          "user.password": 0,
+          commentsData: 0,
+        },
+      },
+    ];
+
+    const feedbacks = await Feedback.aggregate(pipeline);
+    const totalDocs = await Feedback.countDocuments(filter);
+    const totalPages = Math.ceil(totalDocs / pageSize);
+    const response = {
+      feedbacks,
+      pagination: {
+        totalDocs,
+        totalPages,
+        currentPage: pageNum,
+        pageSize,
+        has_nextPage: pageNum < totalPages && totalPages > 0,
+        has_prevPage: pageNum > 1 && totalPages > 0,
+      },
+    };
+    res.status(200).json(response);
   } catch (error) {
     console.error("Error fetching feedbacks:", error);
     res.status(500).json({ message: "Server error" });
