@@ -1,4 +1,5 @@
 import Feedback from "../models/Feedback.js";
+import { getFeedbackCatgeroies } from "../utils/getFeedbackCategories.js";
 
 export async function createFeedback(req, res) {
   const { title, detail, category } = req.body;
@@ -20,9 +21,17 @@ export async function createFeedback(req, res) {
 export async function getFeedbacks(req, res) {
   try {
     const category = req.query.category;
+    const allowedCategories = getFeedbackCatgeroies();
     let filter = {};
     if (category && category !== "All") {
-      filter.category = category;
+      const normalizedCategory =
+        category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
+      if (!allowedCategories.includes(normalizedCategory)) {
+        return res.status(400).json({ message: "Invalid category" });
+      }
+      if (normalizedCategory !== "All") {
+        filter.category = normalizedCategory;
+      }
     }
 
     const feedbacks = await Feedback.find(filter)
