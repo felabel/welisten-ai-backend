@@ -28,10 +28,6 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", message: "WeListen API is alive!" });
 });
 
-// Mount routes (placeholder)
-// app.use("/api/auth", require("./routes/authRoutes"));
-// app.use("/api/feedback", require("./routes/feedbackRoutes"));
-
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);

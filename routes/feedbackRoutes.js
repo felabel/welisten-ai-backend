@@ -8,6 +8,7 @@ import {
   getFeedbackById,
   updateFeedback,
   upvoteFeedback,
+  updateFeedbackStatus,
 } from "../controllers/feedbackController.js";
 
 // 📄 Public: Get all feedback
@@ -22,5 +23,6 @@ router.post("/", protect, createFeedback);
 // 🔐 Private: Update feedback
 router.put("/:id", protect, updateFeedback);
 router.post("/:feedbackId/upvote", protect, upvoteFeedback);
+router.patch("/:id/status", protect, updateFeedbackStatus);
 
 export default router;

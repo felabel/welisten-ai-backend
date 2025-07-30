@@ -1,5 +1,8 @@
 import Feedback from "../models/Feedback.js";
-import { getFeedbackCatgeroies } from "../utils/getFeedbackCategories.js";
+import {
+  getFeedbackCategories,
+  getFeedbackStatus,
+} from "../utils/getFeedbackCategories.js";
 
 export async function createFeedback(req, res) {
   const { title, detail, category } = req.body;
@@ -21,8 +24,8 @@ export async function createFeedback(req, res) {
 export async function getFeedbacks(req, res) {
   try {
     // sort by category
-    const { category, sort, page = 1, limit = 10 } = req.query;
-    const allowedCategories = getFeedbackCatgeroies();
+    const { search, category, sort, page = 1, limit = 10 } = req.query;
+    const allowedCategories = getFeedbackCategories();
     let filter = {};
     if (category && category !== "All") {
       const normalizedCategory =
@@ -33,6 +36,12 @@ export async function getFeedbacks(req, res) {
       if (normalizedCategory !== "All") {
         filter.category = normalizedCategory;
       }
+    }
+
+    // serarch filter
+    if (search && search.trim() !== "") {
+      const regex = new RegExp(search, "i");
+      filter.$or = [{ title: regex }, { detail: regex }, { category: regex }];
     }
 
     const pageNum = parseInt(page, 10);
@@ -154,3 +163,36 @@ export const upvoteFeedback = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+export async function updateFeedbackStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const normalizedStatus =
+      status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+
+    const allowedStatuses = getFeedbackStatus();
+    if (!allowedStatuses.includes(normalizedStatus)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+
+    const updatedFeedback = await Feedback.findByIdAndUpdate(
+      id,
+      { status: normalizedStatus },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedFeedback) {
+      return res.status(404).json({ message: "Feedback not found" });
+    }
+
+    res.status(200).json({
+      message: "Feedback status updated successfully",
+      feedback: updatedFeedback,
+    });
+  } catch (error) {
+    console.error("Error updating feedback status:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+}
