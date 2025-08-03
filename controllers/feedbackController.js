@@ -1,24 +1,107 @@
+import OPENAI from "openai";
 import Feedback from "../models/Feedback.js";
 import {
   getFeedbackCategories,
   getFeedbackStatus,
 } from "../utils/getFeedbackCategories.js";
 
+const openai = new OPENAI({ apiKey: `${process.env.OPENAI_API_KEY}` });
+
 export async function createFeedback(req, res) {
-  const { title, detail, category } = req.body;
+  try {
+    const { title, detail, category } = req.body;
 
-  if (!title || !detail) {
-    return res.status(400).json({ message: "Title and detail are required" });
+    if (!title || !detail) {
+      return res.status(400).json({ message: "Title and detail are required" });
+    }
+
+    const feedback = await Feedback.create({
+      title,
+      detail,
+      category,
+      user: req.user._id,
+    });
+
+    // ✅ Split title+detail into keywords
+    const keywords = `${title} ${detail}`
+      .split(/\s+/)
+      .filter((word) => word.length > 2); // ignore very short words like "a", "to"
+
+    // ✅ Build regex OR conditions for each keyword
+    const keywordRegex = keywords.map((word) => ({
+      $or: [
+        { title: { $regex: word, $options: "i" } },
+        { detail: { $regex: word, $options: "i" } },
+      ],
+    }));
+
+    const similarFeedbackIds = await Feedback.find({
+      _id: { $ne: feedback._id },
+      $or: keywordRegex.map((k) => k.$or).flat(), // flatten all ORs
+    }).distinct("_id");
+
+    const similarFeedbacks = await Feedback.find({
+      _id: { $in: similarFeedbackIds },
+    }).limit(5);
+
+    // Rank by shared keyword count
+    const ranked = similarFeedbacks
+      .map((f) => {
+        const text = `${f.title} ${f.detail}`.toLowerCase();
+        const overlap = keywords.filter((k) =>
+          text.includes(k.toLowerCase())
+        ).length;
+        return { f, score: overlap };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    // Only take top 3 most similar
+    const topSimilar = ranked.slice(0, 3).map((r) => r.f);
+
+    if (topSimilar.length > 0) {
+      const prompt = `
+You are checking if a new user feedback is a duplicate of existing ones.
+
+🔹 New feedback:
+"${title} - ${detail}"
+
+🔹 Existing feedback:
+${similarFeedbacks
+  .map((f) => `ID:${f._id} => ${f.title} - ${f.detail}`)
+  .join("\n")}
+
+Rules:
+- If the new feedback has the same meaning or request as any of the existing ones, mark it as a duplicate.
+- Even if the wording is different but the feature/request is the same, mark it as duplicate.
+- Respond strictly in this JSON format:
+{ "duplicate": true/false, "similarTo": ["id1","id2"] }
+`;
+
+      const aiResponse = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature: 0,
+      });
+
+      const aiResult = JSON.parse(aiResponse.choices[0].message.content);
+      feedback.duplicate = aiResult.duplicate;
+      feedback.similarTo = aiResult.similarTo || [];
+      if (aiResult.duplicate) {
+        return res.status(409).json({
+          message: "Similar feedback exists. Upvote instead.",
+          similarTo: aiResult.similarTo,
+        });
+      }
+
+      await feedback.save();
+    }
+
+    res.status(201).json(feedback);
+  } catch (error) {
+    console.error("Error creating feedback:", error);
+    res.status(500).json({ message: "Server error" });
   }
-
-  const feedback = await Feedback.create({
-    title,
-    detail,
-    category,
-    user: req.user._id,
-  });
-
-  res.status(201).json(feedback);
 }
 
 export async function getFeedbacks(req, res) {

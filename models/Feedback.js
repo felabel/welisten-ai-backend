@@ -30,11 +30,11 @@ const feedbackSchema = new Schema(
       ref: "User",
       required: true,
     },
-    //     user: {
-    //   type: String,
-    //   required: true,
-    // },
-    // comments: [commentSchema],
+    duplicate: {
+      type: Boolean,
+      default: false,
+    },
+    similarTo: [{ type: Schema.Types.ObjectId, ref: "Feedback" }],
   },
   { timestamps: true }
 );
@@ -44,6 +44,6 @@ feedbackSchema.virtual("id").get(function () {
 });
 feedbackSchema.set("toJSON", { virtuals: true });
 
+feedbackSchema.index({ title: "text", detail: "text" });
 const Feedback = model("Feedback", feedbackSchema);
-
 export default Feedback;

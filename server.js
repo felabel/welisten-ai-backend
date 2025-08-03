@@ -1,15 +1,16 @@
 // server.js
+import "./utils/loadEnv.js";
+import { config } from "dotenv";
+config();
+// Load env vars
 
 import express, { json } from "express";
-import { config } from "dotenv";
+
 import cors from "cors";
 import connectDB from "./utils/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
 import commentRoutes from "./routes/commentRoutes.js";
-
-// Load env vars
-config();
 
 // Connect to MongoDB
 connectDB();
