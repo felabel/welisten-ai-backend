@@ -113,11 +113,20 @@ export async function getFeedbacks(req, res) {
     if (category && category !== "All") {
       const normalizedCategory =
         category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
-      if (!allowedCategories.includes(normalizedCategory)) {
+
+      console.log("Normalized Category:", normalizedCategory);
+      console.log("Allowed Categories:", allowedCategories);
+      if (
+        !allowedCategories
+          .map((c) => c.toLowerCase())
+          .includes(normalizedCategory.toLowerCase())
+      ) {
         return res.status(400).json({ message: "Invalid category" });
       }
       if (normalizedCategory !== "All") {
-        filter.category = normalizedCategory;
+        filter.category = allowedCategories.find(
+          (c) => c.toLowerCase() === normalizedCategory.toLowerCase()
+        );
       }
     }
 
@@ -252,17 +261,17 @@ export async function updateFeedbackStatus(req, res) {
     const { id } = req.params;
     const { status } = req.body;
 
-    const normalizedStatus =
-      status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    // const normalizedStatus =
+    //   status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 
     const allowedStatuses = getFeedbackStatus();
-    if (!allowedStatuses.includes(normalizedStatus)) {
+    if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
 
     const updatedFeedback = await Feedback.findByIdAndUpdate(
       id,
-      { status: normalizedStatus },
+      { status: status },
       { new: true, runValidators: true }
     );
 
@@ -276,6 +285,37 @@ export async function updateFeedbackStatus(req, res) {
     });
   } catch (error) {
     console.error("Error updating feedback status:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+}
+
+export async function getCategories(req, res) {
+  try {
+    const categories = getFeedbackCategories();
+    res.status(200).json({ categories });
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+}
+// GET /api/feedback/status-count
+export async function getStatusCount(req, res) {
+  try {
+    const result = await Feedback.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+      { $project: { _id: 0, name: "$_id", count: 1 } },
+    ]);
+
+    // Ensure all statuses are returned, even if count is 0
+    const allStatuses = getFeedbackStatus();
+    const statusCount = allStatuses.map((status) => {
+      const found = result.find((r) => r.name === status);
+      return { name: status, count: found ? found.count : 0 };
+    });
+
+    res.status(200).json({ statusCount });
+  } catch (error) {
+    console.error("Error fetching status count:", error);
     res.status(500).json({ message: "Server error" });
   }
 }

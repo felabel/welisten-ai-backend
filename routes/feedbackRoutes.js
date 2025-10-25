@@ -9,11 +9,14 @@ import {
   updateFeedback,
   upvoteFeedback,
   updateFeedbackStatus,
+  getCategories,
+  getStatusCount,
 } from "../controllers/feedbackController.js";
 
 // 📄 Public: Get all feedback
 router.get("/", getFeedbacks);
-
+router.get("/categories", getCategories);
+router.get("/status-count", getStatusCount);
 // 📄 Public: Get feedback by ID
 router.get("/:id", getFeedbackById);
 
